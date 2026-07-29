@@ -6,3 +6,4 @@ akshare>=1.12
 pandas>=2.0
 requests>=2.31
 plotly>=5.18
+backtrader>=1.9.78
