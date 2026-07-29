@@ -1,0 +1,28 @@
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+*.egg-info/
+.pytest_cache/
+
+# 虚拟环境
+.venv/
+venv/
+env/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+
+# OS
+.DS_Store
+Thumbs.db
+
+# 测试探针输出（tests/probe_*.txt 是历史调试输出，可保留；新调试不入库）
+tests/probe_*.txt.bak
+
+# Streamlit 缓存
+.streamlit/secrets.toml
+
+# 注意：data/signals.db 故意入库（积累历史用），不要忽略

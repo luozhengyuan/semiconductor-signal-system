@@ -1,0 +1,140 @@
+# 半导体信号系统 · GitHub Actions 自动采集
+#
+# 触发方式：
+#   1. 定时：每周一/周四 北京时间 09:00 自动跑（cron 用 UTC，BJT=UTC+8）
+#      - 周一：全量采集（价格/营收/盈利/拥挤度/热搜）
+#      - 周四：高频信号（拥挤度/热搜，--only）
+#   2. 手动：GitHub 仓库 Actions 页 → 选 "Auto Collect" → Run workflow
+#
+# 跑完后：
+#   - data/signals.db 自动 commit & push 回仓库（积累历史）
+#   - 抓取日志写入 fetch_log 表，可在 Streamlit 看板查看
+#   - 失败时退出码非 0，Actions 标红，便于发现
+#
+# 首次使用：
+#   1. 把本仓库推到 GitHub
+#   2. Settings → Actions → General → Workflow permissions 勾选 "Read and write permissions"
+#   3. 之后每周一/周四自动跑，无需手动干预
+
+name: Auto Collect
+
+on:
+  schedule:
+    # 周一 01:00 UTC = 北京时间 09:00（全量）
+    - cron: '0 1 * * 1'
+    # 周四 01:00 UTC = 北京时间 09:00（高频）
+    - cron: '0 1 * * 4'
+  workflow_dispatch:
+    # 手动触发时可选择模式
+    inputs:
+      mode:
+        description: '采集模式'
+        type: choice
+        options:
+          - full           # 全量
+          - high_freq      # 仅高频信号
+          - backfill_tw    # 全量 + 回填台股历史
+          - backfill_dram  # 全量 + 回填存储价历史
+        default: 'full'
+
+permissions:
+  contents: write   # 允许 workflow push 回仓库
+
+concurrency:
+  group: collect-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  collect:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+          cache: 'pip'
+          cache-dependency-path: requirements.txt
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+
+      - name: Determine mode
+        id: mode
+        run: |
+          if [ "${{ github.event_name }}" = "schedule" ]; then
+            # 周一全量，周四高频
+            if [ "$(date -u +%w)" = "1" ]; then
+              echo "mode=full" >> $GITHUB_OUTPUT
+            else
+              echo "mode=high_freq" >> $GITHUB_OUTPUT
+            fi
+          else
+            echo "mode=${{ github.event.inputs.mode }}" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Run collectors (full)
+        if: steps.mode.outputs.mode == 'full' || steps.mode.outputs.mode == 'backfill_tw' || steps.mode.outputs.mode == 'backfill_dram'
+        run: |
+          python scripts/collect.py --json
+        continue-on-error: true
+        id: collect_full
+
+      - name: Run collectors (high_freq only)
+        if: steps.mode.outputs.mode == 'high_freq'
+        run: |
+          python scripts/collect.py --only crowding,hot_heat --json
+        continue-on-error: true
+        id: collect_hf
+
+      - name: Backfill TW revenue
+        if: steps.mode.outputs.mode == 'backfill_tw'
+        run: |
+          python scripts/collect.py --backfill tw_revenue
+        continue-on-error: true
+
+      - name: Backfill DRAM price
+        if: steps.mode.outputs.mode == 'backfill_dram'
+        run: |
+          python scripts/collect.py --backfill dram_price
+        continue-on-error: true
+
+      - name: Show summary
+        if: always()
+        run: |
+          echo "=== 数据库最新状态 ==="
+          python -c "
+          import sys; sys.path.insert(0, '.')
+          from sig import db
+          conn = db.get_conn()
+          for o in db.data_overview(conn):
+              tag = '✅' if o['fresh'] else '🟡'
+              print(f\"{tag} {o['name']}: 数据到 {o['latest']}（{o['rows']} 行，{o['span']}）\")
+          conn.close()
+          "
+
+      - name: Commit & push signals.db
+        if: always()
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add data/signals.db
+          if git diff --cached --quiet; then
+            echo "无数据变化，跳过 push"
+          else
+            git commit -m "chore(data): auto-collect $(date -u +%Y-%m-%d) [mode=${{ steps.mode.outputs.mode }}]"
+            git push
+            echo "✅ 已推送 signals.db 到仓库"
+          fi
+
+      - name: Fail if collectors failed
+        if: steps.collect_full.outcome == 'failure' || steps.collect_hf.outcome == 'failure'
+        run: |
+          echo "❌ 采集器有失败，详见上方日志"
+          exit 1

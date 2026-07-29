@@ -1,0 +1,167 @@
+===== trendforce: OK =====
+https://www.trendforce.cn/presscenter/news -> 200, len=97861, enc=UTF-8
+<script>
+/* press-list-nav-fix */		
+window.addEventListener('scroll', function(e) {
+  let Array = window.scroll();
+  let top = Array['top'];
+  let dom = document.getElementById('press-list-nav-fix');
+  if ( top > 300)  {        
+       dom.classList.add('press-list-nav-fix');  
+  } else {
+      dom.classList.remove('press-list-nav-fix'); 
+  }
+  
+});
+	
+		
+function scroll(){
+    if(window.pageXOffset != null){ // ie9+ 和 最新??器
+        return {
+            top: window.pageYOffset,
+            left: window.pageXOffset
+        }
+    }else if(document.compatMode == 'CSS1Compat'){ // 遵循W3C??器
+        return {
+            top: document.documentElement.scrollTop,
+            left: document.documentElement.scrollLeft
+        }
+    }
+    return {//其他
+        top: document.body.scrollTop,
+        left:
+https://www.trendforce.cn/ -> 200, len=117777, enc=UTF-8
+<!DOCTYPE html>
+<!--[if lt IE 10]> <html lang="zh-cn" class="iex"> <![endif]-->
+<!--[if (gt IE 10)|!(IE)]><!-->
+<html lang="zh-cn">
+<!--<![endif]-->
+    <head>
+        <meta charset="utf-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+            
+                    <title>集邦咨询-半导体、LED、显示面板、新能源等国际高科技产业研究机构</title>
+            <meta name="keywords" content="半导体市场分析报告，LED市场分析报告，显示面板市场分析报告，太阳能光伏产业市场分析报告，晶圆代工市场分析报告，MLCC市场分析报告，第三代半导体市场分析报告">
+            <meta name="description" content="集邦咨询是国际高科技产业市场研究机构，研究范围涵盖半导体、LED、显示面板、新能源、太阳能光伏、晶圆代工、第三代半导体、MLCC等领域，提供产业市场分析报告与咨询顾问服务。">
+                <link rel="canonical" href="https://www.trendforce.cn/" />
+    <meta name="csrf-token" content="7qL7e9HocY7fdA71PS4CfPPR
+
+===== cfm: OK =====
+https://www.chinaflashmarket.com/ -> 200, len=127587
+<!doctype html>
+<html lang="zh-CN">
+<head>
+    <title>首页_CFM闪存市场</title>
+            <meta name="csrf-param" content="_csrf">
+<meta name="csrf-token" content="HR4PA3emd2ykdZi3l6kAPiT5FIBZcZG2JLqEQ-wg4MFJZ3wwQORAB-1E79PPxk5_UZEjsykYo_lR0rUaq2S2pg==">
+    <meta name="keywords" content="NAND Flash,3D NAND,TLC,MLC,memory,DRAM,LPDDR,UDP,SSD,eMMC,eMCP,UFS,固态硬盘,存储,闪存,内存,现货,白牌,产品报价,财报,股价,市场行情,涨价,产业研究,行情分析,SSD测试,数据报告,价格走势">
+<meta name="description" content="CFM闪存市场网站(www.chinaflashmarket.com)是国内权威的存储市场资讯平台,专业提供闪存行业产品价格,信息咨询,产品顾问,产业分析等极具价值商业资讯.">
+<link href="/static/css/bootstrap.min.css?v=1694588411" rel="stylesheet">
+<link href="/static/css/global.min.css?v=1780885109" rel="stylesheet">
+<link href="/static/css/cfm-icon.min.css?v=1763974965" rel="stylesheet">
+<link href="/static/plugins/toastr/toas
+https://www.chinaflashmarket.com/price -> 200, len=151980
+<!doctype html>
+<html lang="zh-CN">
+<head>
+    <title>报价中心_CFM闪存市场</title>
+            <meta name="csrf-param" content="_csrf">
+<meta name="csrf-token" content="wfkRbvTiufN6BfjSimbVRWNgVl45294joMQo0BjoCxSHm2IkuKfYpT93r5r8LO19CQoYMg6KvGfJrkGCR6lsTA==">
+    <meta name="keywords" content="NAND Flash,3D NAND,TLC,MLC,memory,DRAM,LPDDR,UDP,SSD,eMMC,eMCP,UFS,固态硬盘,存储,闪存,内存,现货,白牌,产品报价,财报,股价,市场行情,涨价,产业研究,行情分析,SSD测试,数据报告,价格走势">
+<meta name="description" content="CFM闪存市场网站(www.chinaflashmarket.com)是国内权威的存储市场资讯平台,专业提供闪存行业产品价格,信息咨询,产品顾问,产业分析等极具价值商业资讯.">
+<link href="/static/css/bootstrap.min.css?v=1694588411" rel="stylesheet">
+<link href="/static/css/global.min.css?v=1780885109" rel="stylesheet">
+<link href="/static/css/cfm-icon.min.css?v=1763974965" rel="stylesheet">
+<link href="/static/plugins/toastr/to
+
+===== twse: OK =====
+rows=1082 keys=['出表日期', '資料年月', '公司代號', '公司名稱', '產業別', '營業收入-當月營收', '營業收入-上月營收', '營業收入-去年當月營收', '營業收入-上月比較增減(%)', '營業收入-去年同月增減(%)', '累計營業收入-當月累計營收', '累計營業收入-去年累計營收', '累計營業收入-前期比較增減(%)', '備註']
+[
+ {
+  "出表日期": "1150717",
+  "資料年月": "11506",
+  "公司代號": "2330",
+  "公司名稱": "台積電",
+  "產業別": "半導體業",
+  "營業收入-當月營收": "442679969",
+  "營業收入-上月營收": "416975163",
+  "營業收入-去年當月營收": "263708978",
+  "營業收入-上月比較增減(%)": "6.164589232380731",
+  "營業收入-去年同月增減(%)": "67.86685548491262",
+  "累計營業收入-當月累計營收": "2404483690",
+  "累計營業收入-去年累計營收": "1773045533",
+  "累計營業收入-前期比較增減(%)": "35.613194655616326",
+  "備註": "因先進製程產品需求增加所致。"
+ },
+ {
+  "出表日期": "1150717",
+  "資料年月": "11506",
+  "公司代號": "2337",
+  "公司名稱": "旺宏",
+  "產業別": "半導體業",
+  "營業收入-當月營收": "6956348",
+  "營業收入-上月營收": "6255653",
+  "營業收入-去年當月營收": "2200717",
+  "營業收入-上月比較增減(%)": "11.200988929533017",
+  "營業收入-去年同月增減(%)": "216.09461825395996",
+  "累計營業收入-當月累計營收": "29593392",
+  "累計營業收入-去年累計營收": "12936718",
+  "累計營業收入-前期比較增減(%)": "128.75502117306723",
+  "備註": "受市場需求增加影響。"
+ },
+ {
+  "出表日期": "1150717",
+  "資料年月": "11506",
+  "公司代號": "2344",
+  "公司名稱": "華邦電",
+  "產業別": "半導體業",
+  "營業收入-當月營收": "20596799",
+  "營業收入-上月營收": "20001444",
+  "營業收入-去年當月營收": "7105364",
+  "營業收入-上月比較增減(%)": "2.9765600923613316",
+  "營業收入-去年同月增減(%)": "189.87676071204797",
+  "累計營業收入-當月累計營收": "98096329",
+  "累計營業收入-去年累計營收": "41010574",
+  "累計營業收入-前期比較增減(%)": "139.19764936720955",
+  "備註": "受市場供需影響。"
+ },
+ {
+  "出表日期": "1150717",
+  "資料年月": "11506",
+  "公司代號": "2408",
+  "公司名稱": "南亞科",
+  "產業別": "半導體業",
+  "營業收入-當月營收": "29388309",
+  "營業收入-上月營收": "27669563",
+  "營業收入-去年當月營收": "4074153",
+  "營業收入-上月比較增減(%)": "6.211684658698802",
+  "營業收入-去年同月增減(%)": "621.3354284927444",
+  "累計營業收入-當月累計營收": "131636005",
+  "累計營業收入-去年累計營收": "17714034",
+  "累計營業收入-前期比較增減(%)": "643.1170392921229",
+  "備註": "受市場需求成長影響。"
+ }
+]
+
+===== ths_forecast: OK =====
+cols=['年度', '预测机构数', '最小值', '均值', '最大值', '行业平均数']
+     年度  预测机构数    最小值     均值     最大值  行业平均数
+0  2026     23  22.58  54.89  139.70  32.89
+1  2027     23  27.69  67.62  165.80  46.61
+2  2028     20  45.67  84.67  165.72  63.43
+
+===== sina_daily: OK =====
+cols=['date', 'open', 'high', 'low', 'close', 'volume', 'amount', 'outstanding_share', 'turnover'] rows=2204
+            date    open    high     low   close      volume        amount  outstanding_share  turnover
+2201  2026-07-22  479.94  501.26  460.00  470.00  75906055.0  3.682604e+10        668491934.0  0.113548
+2202  2026-07-23  480.00  483.16  444.22  451.96  47134043.0  2.166988e+10        668491934.0  0.070508
+2203  2026-07-24  444.00  462.50  438.50  457.00  50554262.0  2.286053e+10        668491934.0  0.075624
+
+===== mrs_db: OK =====
+tables=['tasks', 'sqlite_sequence', 'videos', 'comments', 'reports', 'keyword_groups', 'hotlist_snap']
+cols=['platform', 'board', 'term', 'rank', 'heat', 'snap_date'] rows=66412
+('weibo', '微博热搜', '肖战白玉兰VCR', 49, 0, '2026-06-24')
+('weibo', '微博热搜', '徐洁儿说双人秀是内投结果', 48, 0, '2026-06-24')
+('weibo', '微博热搜', '丁禹兮演技', 47, 0, '2026-06-24')
+

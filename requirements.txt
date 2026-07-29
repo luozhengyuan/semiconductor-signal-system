@@ -1,0 +1,8 @@
+# 半导体信号系统 · Python 依赖
+# 安装：pip install -r requirements.txt
+
+streamlit>=1.30
+akshare>=1.12
+pandas>=2.0
+requests>=2.31
+plotly>=5.18
