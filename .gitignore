@@ -26,3 +26,6 @@ tests/probe_*.txt.bak
 .streamlit/secrets.toml
 
 # 注意：data/signals.db 故意入库（积累历史用），不要忽略
+
+# Syncthing 冲突文件（已弃用 Syncthing，遗留规则防止旧冲突文件误入库）
+*sync-conflict*
