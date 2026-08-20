@@ -68,8 +68,10 @@ th = db.thresholds(conn)
 THRESHOLD_UI = {
     "tw_revenue": [("tw_yoy_green", "营收同比绿灯线（%）", 0.0, 100.0)],
     "crowding": [("crowding_red", "拥挤度红灯线（量比）", 1.0, 5.0)],
-    "hot_heat": [("heat_pct_red", "情绪爆表红线（60日分位）", 50.0, 99.0),
-                 ("heat_pct_yellow", "情绪升温黄线（60日分位）", 10.0, 90.0)],
+    "hot_heat": [("heat_pct_red", "情绪爆表红线（同口径60日分位）", 50.0, 99.0),
+                 ("heat_pct_yellow", "情绪升温黄线（同口径60日分位）", 10.0, 90.0),
+                 ("heat_abs_red", "爆表绝对线（积累期用）", 100.0, 500.0),
+                 ("heat_abs_yellow", "升温绝对线（积累期用）", 20.0, 300.0)],
 }
 if key in THRESHOLD_UI:
     st.subheader("⚙️ 打分阈值（调整后即时生效，永久保存）")

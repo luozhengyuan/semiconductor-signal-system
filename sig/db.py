@@ -47,7 +47,7 @@ def get_conn(db_path=None):
         );
         CREATE TABLE IF NOT EXISTS crowding (
             trade_date TEXT NOT NULL,
-            amount REAL, ratio20 REAL,
+            amount REAL, close REAL, ratio20 REAL,
             PRIMARY KEY (trade_date)
         );
         CREATE TABLE IF NOT EXISTS hot_heat (
@@ -76,6 +76,14 @@ def get_conn(db_path=None):
         );
         """
     )
+    # 已有库迁移：crowding 加 close 列（2026-08-18 起量比<1 时结合价格背景判断）；
+    # hot_heat 加 src 口位列（'synth'=三源合成，NULL=旧微博单一口径，分位只在同口径内比较）
+    cols = {r[1] for r in conn.execute("PRAGMA table_info(crowding)")}
+    if "close" not in cols:
+        conn.execute("ALTER TABLE crowding ADD COLUMN close REAL")
+    cols = {r[1] for r in conn.execute("PRAGMA table_info(hot_heat)")}
+    if "src" not in cols:
+        conn.execute("ALTER TABLE hot_heat ADD COLUMN src TEXT")
     conn.commit()
     return conn
 

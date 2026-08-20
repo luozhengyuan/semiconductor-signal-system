@@ -32,7 +32,7 @@ if not backtest.HAS_BACKTRADER:
     st.stop()
 
 st.markdown(
-    '<p class="knote">把历史综合评分（🟢数 − 🔴数）作为交易信号，用 Backtrader 跑回测，'
+    '<p class="knote">把历史信号（方向分 + 风险灯 → 目标仓位）作为交易信号，用 Backtrader 跑回测，'
     '对比"买入持有"基准。<b>这是把"经验规则"升级为"实测数据"的关键一步</b>。<br>'
     '⚠️ <b>数据限制</b>：系统从 2026-01 开始积累数据，回测窗口较短，结果<b>仅供参考</b>，'
     '不构成投资建议。随着 CI 自动积累，数据会越来越长，回测结果会越来越可靠。</p>',
@@ -48,30 +48,25 @@ if scores.empty:
     conn.close()
     st.stop()
 
+d = scores["direction"]
 st.markdown(
     f'<div class="ksrc"><div class="t">📅 可回测区间</div>'
     f'<div class="row">评分序列：<b>{scores.index[0].date()} ~ {scores.index[-1].date()}</b>'
     f'（{(scores.index[-1] - scores.index[0]).days} 天，{len(scores)} 个评分点）</div>'
-    f'<div class="row">综合评分分布：🟢{(scores > 0).sum()} 天 ｜ 🟡{((scores == 0)).sum()} 天 ｜'
-    f'🔴{(scores < 0).sum()} 天</div></div>',
+    f'<div class="row">方向分分布：🟢{(d > 0).sum()} 天 ｜ 🟡{((d == 0)).sum()} 天 ｜'
+    f'🔴{(d < 0).sum()} 天 ｜ 风险灯亮起：{(scores["risk_on"] > 0).sum()} 天</div></div>',
     unsafe_allow_html=True,
 )
 
 # ---- 参数调节 ----
-col1, col2, col3 = st.columns(3)
-with col1:
-    buy_th = st.number_input("满仓阈值（评分 ≥ 此值时满仓）", min_value=-5, max_value=5, value=3, step=1)
-with col2:
-    sell_th = st.number_input("清仓阈值（评分 ≤ 此值时清仓）", min_value=-5, max_value=5, value=-3, step=1)
-with col3:
-    initial_cash = st.selectbox("初始资金", [100_000, 500_000, 1_000_000], index=2, format_func=lambda x: f"¥{x:,}")
+initial_cash = st.selectbox("初始资金", [100_000, 500_000, 1_000_000], index=2, format_func=lambda x: f"¥{x:,}")
 
 st.markdown(
-    f'<p class="knote">交易规则：评分 ≥ {buy_th} <b>满仓</b> ｜ '
-    f'1 ~ {buy_th - 1} <b>半仓</b> ｜ 0 <b>观望</b> ｜ '
-    f'{sell_th + 1} ~ -1 <b>半仓</b> ｜ 评分 ≤ {sell_th} <b>清仓</b><br>'
-    f'标的：6 只 A 股存储股等权组合（兆易创新/江波龙/佰维/德明利/香农/深科技）｜ '
-    f'基准：买入持有同一组合 | 手续费：0.1%</p>',
+    '<p class="knote">交易规则（与首页新口径一致）：方向分（价格/营收/盈利 🔴−🟢）→ 基准仓位'
+    '（+2→75% / +1→55% / 0→40% / −1→25% / ≤−2→10%），再乘风险折减'
+    '（拥挤度/情绪每亮 1 盏灯 ×0.75，2 盏 ×0.5）得目标仓位<br>'
+    '标的：6 只 A 股存储股等权组合（兆易创新/江波龙/佰维/德明利/香农/深科技）｜ '
+    '基准：买入持有同一组合 | 手续费：0.1%</p>',
     unsafe_allow_html=True,
 )
 
@@ -89,7 +84,6 @@ if st.button("🚀 运行回测", type="primary"):
     with st.spinner("正在跑 Backtrader 回测…"):
         result = backtest.run_backtest(
             conn, score_series=scores, price_data=price_data,
-            buy_threshold=buy_th, sell_threshold=sell_th,
             initial_cash=initial_cash,
         )
 
@@ -151,24 +145,29 @@ fig.update_layout(
 st.plotly_chart(fig, use_container_width=True)
 
 # 评分时间序列
-st.subheader("🎯 综合评分时间序列")
+st.subheader("🎯 方向分与目标仓位时间序列")
 score_series = result["score_series"]
 fig2 = go.Figure()
-# 用颜色区分正负
-colors = ["#1B6B3A" if v > 0 else ("#B03A2E" if v < 0 else "#6b6a64") for v in score_series.values]
+colors = ["#1B6B3A" if v > 0 else ("#B03A2E" if v < 0 else "#6b6a64")
+          for v in score_series["direction"].values]
 fig2.add_trace(go.Bar(
-    x=score_series.index, y=score_series.values,
-    marker_color=colors, name="综合评分",
+    x=score_series.index, y=score_series["direction"],
+    marker_color=colors, name="方向分",
     hovertemplate="%{x|%Y-%m-%d}: %{y}<extra></extra>",
 ))
-fig2.add_hline(y=buy_th, line_dash="dash", line_color="#1B365D",
-               annotation_text=f"满仓线 ({buy_th})")
-fig2.add_hline(y=sell_th, line_dash="dash", line_color="#B03A2E",
-               annotation_text=f"清仓线 ({sell_th})")
+fig2.add_trace(go.Scatter(
+    x=score_series.index, y=score_series["target"] * 100,
+    name="目标仓位 %", yaxis="y2",
+    line=dict(color="#B7791F", width=1.5, dash="dot"),
+    hovertemplate="%{x|%Y-%m-%d}: %{y:.0f}%<extra></extra>",
+))
 fig2.update_layout(
-    height=250, margin=dict(l=20, r=20, t=10, b=20),
+    height=300, margin=dict(l=20, r=20, t=10, b=20),
     paper_bgcolor="rgba(0,0,0,0)", plot_bgcolor="rgba(0,0,0,0)",
-    yaxis=dict(title="评分", gridcolor="#e8e6dc", dtick=1),
+    legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1),
+    yaxis=dict(title="方向分", gridcolor="#e8e6dc", dtick=1),
+    yaxis2=dict(title="目标仓位 %", overlaying="y", side="right",
+                range=[0, 100], gridcolor="rgba(0,0,0,0)"),
     xaxis=dict(gridcolor="#e8e6dc"),
 )
 st.plotly_chart(fig2, use_container_width=True)
@@ -178,14 +177,16 @@ trades = result["trades"]
 if trades:
     st.subheader(f"📝 交易明细（{len(trades)} 笔）")
     trades_df = pd.DataFrame(trades)
-    trades_df["open_date"] = pd.to_datetime(trades_df["open_date"]).dt.date
-    trades_df["close_date"] = pd.to_datetime(trades_df["close_date"]).dt.date
+    trades_df["date"] = pd.to_datetime(trades_df["date"]).dt.date
+    trades_df["方向"] = trades_df["size"].apply(lambda s: "买入" if s > 0 else "卖出")
+    trades_df["size"] = trades_df["size"].abs()
+    trades_df["value"] = trades_df["value"].abs().round(0)
+    trades_df["exec_price"] = trades_df["exec_price"].round(2)
     trades_df = trades_df.rename(columns={
-        "open_date": "开仓日", "close_date": "平仓日", "size": "数量",
-        "open_price": "开仓价", "close_price": "平仓价",
-        "pnl": "盈亏(¥)", "pnl_pct": "盈亏(%)",
+        "date": "日期", "exec_price": "成交价", "size": "数量", "value": "金额(¥)",
     })
-    st.dataframe(trades_df, use_container_width=True, hide_index=True)
+    st.dataframe(trades_df[["日期", "方向", "成交价", "数量", "金额(¥)"]],
+                 use_container_width=True, hide_index=True)
 else:
     st.info("回测期间无交易（评分信号始终在观望区间）。")
 

@@ -53,10 +53,12 @@ def run_subset(conn, sources):
         if source not in sources:
             continue
         try:
-            n = fn(conn)
-            db.log_fetch(conn, source, "ok", n)
-            results[source] = {"status": "ok", "n": n, "msg": ""}
-            print(f"  ✅ {name}: +{n} 行")
+            ret = fn(conn)
+            n, warn = ret if isinstance(ret, tuple) else (ret, "")
+            status = "warn" if warn else "ok"
+            db.log_fetch(conn, source, status, n, warn)
+            results[source] = {"status": status, "n": n, "msg": warn}
+            print(f"  ✅ {name}: +{n} 行" + (f"（⚠️ {warn}）" if warn else ""))
         except Exception as e:  # noqa: BLE001
             msg = f"{type(e).__name__}: {e}"
             db.log_fetch(conn, source, "fail", 0, msg)

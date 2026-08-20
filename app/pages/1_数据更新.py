@@ -47,7 +47,7 @@ if st.button("🚀 一键更新全部数据源", type="primary"):
         "ts": dt.datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
         "rows": [
             {"数据源": names[src],
-             "状态": "✅ 成功" if s == "ok" else "❌ 失败",
+             "状态": "✅ 成功" if s == "ok" else ("⚠️ 部分成功" if s == "warn" else "❌ 失败"),
              "本次写入行数": n,
              "数据最新到": ov[src]["latest"] or "—",
              "说明": msg or "—"}
@@ -117,6 +117,8 @@ for key, src in SOURCES.items():
         status_html = '<span class="knote">尚未抓取</span>'
     elif last["status"] == "ok":
         status_html = f'<span class="ok">✅ 成功</span>（{last["ts"]}，{last["n_rows"]} 行）'
+    elif last["status"] == "warn":
+        status_html = f'<span class="knote">⚠️ 部分成功</span>（{last["ts"]}，{last["n_rows"]} 行：{last["message"]}）'
     else:
         status_html = f'<span class="fail">❌ 失败</span>（{last["ts"]}：{last["message"]}）'
     st.markdown(

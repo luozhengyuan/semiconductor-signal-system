@@ -2,10 +2,10 @@
 """
 Backtrader 回测模块。
 
-核心思路：
-1. 从 db 读取 5 个信号的历史数据，对每个交易日重新计算评分（与 scorecard.py 同逻辑）
-2. 综合评分 = 🟢数 − 🔴数（⚪ 不参与）
-3. 评分作为交易信号：≥3 满仓 / 1~2 半仓 / 0 观望 / -1~-2 半仓 / ≤-3 清仓
+核心思路（2026-08-18 起与 scorecard 新口径一致）：
+1. 从 db 读取 5 个信号的历史数据，对每个交易日重新计算（与 scorecard.py 同逻辑）
+2. 方向分 = 产业信号（价格/营收/盈利）🔴−🟢，范围 -3 ~ +3
+3. 风险灯 = 拥挤度/情绪中危险灯数量；目标仓位 = 基准仓位 × 风险折减（每灯 -25%）
 4. 标的为 STOCK_POOL 的 6 只股票等权组合
 5. 与"买入持有"基准对比，输出夏普/最大回撤/年化收益/资金曲线
 
@@ -33,7 +33,7 @@ except ImportError:
 # ---------------- 1. 历史评分序列构造 ----------------
 
 def _price_score_series(conn):
-    """存储价格趋势：每日按"当周全部产品涨跌幅均值"打分，>0🟢 =0🟡 <0🔴"""
+    """存储价格趋势：每日按"当周全部产品涨跌幅均值"打分，>0🔴 =0🟡 <0🟢"""
     df = pd.read_sql_query(
         "SELECT date, AVG(chg_pct) AS avg_chg FROM dram_price "
         "GROUP BY date ORDER BY date", conn)
@@ -46,7 +46,7 @@ def _price_score_series(conn):
 
 
 def _tw_revenue_score_series(conn, th):
-    """台系月营收：每月按"存储三家同比均值"打分，>threshold🟢 0~threshold🟡 <0🔴"""
+    """台系月营收：每月按"存储三家同比均值"打分，>threshold🔴 0~threshold🟡 <0🟢"""
     df = pd.read_sql_query(
         "SELECT month, AVG(yoy_pct) AS avg_yoy FROM tw_revenue "
         "WHERE code IN ('2408','2344','2337') GROUP BY month ORDER BY month", conn)
@@ -60,7 +60,7 @@ def _tw_revenue_score_series(conn, th):
 
 
 def _profit_score_series(conn):
-    """盈利预测修正：每个快照日按"当年预测合计与上次比"打分，>0.1%🟢 <-0.1%🔴 否则🟡"""
+    """盈利预测修正：每个快照日按"当年预测合计与上次比"打分，>0.1%🔴 <-0.1%🟢 否则🟡"""
     df = pd.read_sql_query(
         "SELECT snap_date, year, SUM(mean) AS total FROM profit_forecast "
         "GROUP BY snap_date, year ORDER BY snap_date, year", conn)
@@ -81,39 +81,61 @@ def _profit_score_series(conn):
 
 
 def _crowding_score_series(conn, th):
-    """拥挤度：每日按量比打分，>red🔴 1~red🟡 <1🟢（反向指标）"""
+    """拥挤度（风险灯）：>red 危险(-1)；1~red 🟡；<1 结合价格背景——
+    有 close 数据：上行段缩量惜售(+1)/下行段承接乏力(0)；无 close 历史：中性(0)"""
     df = pd.read_sql_query(
-        "SELECT trade_date, ratio20 FROM crowding ORDER BY trade_date", conn)
+        "SELECT trade_date, ratio20, close FROM crowding ORDER BY trade_date", conn)
     if df.empty:
         return pd.Series(dtype=float)
     red = th["crowding_red"]
-    df["score"] = df["ratio20"].apply(
-        lambda x: -1 if x > red else (1 if x < 1.0 else 0))
-    s = df.set_index(pd.to_datetime(df["trade_date"]))["score"]
+    idx = pd.to_datetime(df["trade_date"])
+    # 价格背景：20 日滚动窗口，最新收盘处上半区且 5 日均价 ≥ 20 日均价
+    c = df["close"]
+    has_close = c.notna()
+    c = c.ffill()
+    win_pos = (c - c.rolling(20, min_periods=10).min()) / (
+        c.rolling(20, min_periods=10).max() - c.rolling(20, min_periods=10).min())
+    ma5, ma20 = c.rolling(5, min_periods=3).mean(), c.rolling(20, min_periods=10).mean()
+    up = has_close & (win_pos >= 0.5) & (ma5 >= ma20)
+
+    def _score(row):
+        ratio = row["ratio20"]
+        if ratio > red:
+            return -1
+        if ratio >= 1.0:
+            return 0
+        return 1 if row["up"] else 0  # <1：上行段缩量才给偏多分
+
+    df["up"] = up
+    df["score"] = df.apply(_score, axis=1)
+    s = pd.Series(df["score"].values, index=idx)
     return s.resample("D").ffill()
 
 
 def _heat_score_series(conn, th):
-    """热搜热度：每日按 60 日分位打分，>red%🔴 >yellow%🟡 其他🟢（反向指标）"""
+    """情绪热度（风险灯）：heat=0 中性(0，零膨胀防护)；非零按绝对热度分档，
+    ≥abs_red 危险(-1) ≥abs_yellow 🟡(0) 其他(+1)（反向指标，与 scorecard 积累期口径一致）"""
     df = pd.read_sql_query(
         "SELECT snap_date, heat FROM hot_heat ORDER BY snap_date", conn)
     if df.empty:
         return pd.Series(dtype=float)
     df["snap_date"] = pd.to_datetime(df["snap_date"])
     df = df.set_index("snap_date").sort_index()
-    # 60 日滚动分位
-    pct = df["heat"].rolling(60, min_periods=10).rank(pct=True) * 100
-    red, yellow = th["heat_pct_red"], th["heat_pct_yellow"]
-    score = pct.apply(
-        lambda x: -1 if x > red else (1 if x <= yellow else 0))
+    abs_red, abs_yellow = th["heat_abs_red"], th["heat_abs_yellow"]
+    score = pd.Series(0, index=df.index, dtype=float)
+    nonzero = df["heat"] > 0
+    score[nonzero] = df["heat"][nonzero].apply(
+        lambda v: -1 if v >= abs_red else (0 if v >= abs_yellow else 1))
     return score
 
 
 def build_daily_scores(conn, th=None, min_signals=3):
-    """合成每日综合评分序列（-5 ~ +5）。
+    """构造每日「方向分 + 风险灯 + 目标仓位」序列（与 scorecard.composite 同口径）。
 
-    返回 pd.Series，index 为日期，value 为综合评分 = 🟢数 − 🔴数。
-    各信号按日历日 forward-fill 对齐。
+    返回 pd.DataFrame，index 为日期，列：
+    - direction: 方向分 = 产业信号 🔴−🟢（-3 ~ +3，缺失信号按 0 中性）
+    - risk_on:   亮起的风险灯数（0~2）
+    - target:    目标仓位 = 基准仓位 × 风险折减（0.1 ~ 0.75）
 
     min_signals: 至少要有这么多信号有真实数据（非 fillna 补的 0）才返回评分。
                 默认 3，避免只有拥挤度一个信号时误导回测。
@@ -128,6 +150,14 @@ def build_daily_scores(conn, th=None, min_signals=3):
         "crowding": _crowding_score_series(conn, th),
         "heat": _heat_score_series(conn, th),
     }
+    # 各信号 forward-fill 延伸到今天（周度/月度/快照序列的 resample 只到其最后一个数据点，
+    # 不延伸会导致最近几天信号缺失按中性 0 处理——旧版隐藏 bug）
+    end = pd.Timestamp.today().normalize()
+    series = {
+        k: (s.reindex(pd.date_range(s.index.min(), end, freq="D"), method="ffill")
+            if not s.empty else s)
+        for k, s in series.items()
+    }
 
     # 对齐到同一日期范围
     df = pd.DataFrame(series)
@@ -135,17 +165,24 @@ def build_daily_scores(conn, th=None, min_signals=3):
     first_valid = {k: s.first_valid_index() for k, s in series.items() if not s.empty}
     if len(first_valid) < min_signals:
         # 信号太少，返回空
-        return pd.Series(dtype=float)
+        return pd.DataFrame()
 
     # 只保留至少 min_signals 个信号都有真实数据的窗口
     start_date = sorted(first_valid.values())[min_signals - 1]
     df = df.loc[df.index >= start_date]
 
     df = df.dropna(how="all")
-    df = df.fillna(0)  # 某信号缺失视为中性（不计入综合评分）
-    # 综合评分 = 🟢数(1) − 🔴数(-1)；🟡(0) 与缺失(0) 不影响
-    df["composite"] = df.sum(axis=1)
-    return df["composite"]
+    df = df.fillna(0)  # 某信号缺失视为中性
+
+    df["direction"] = df[["price", "tw_revenue", "profit"]].sum(axis=1)
+    df["risk_on"] = ((df["crowding"] == -1).astype(int)
+                     + (df["heat"] == -1).astype(int))
+
+    # 方向分 → 基准仓位（与 scorecard.composite 的基准仓位区间取中值）
+    base = df["direction"].apply(
+        lambda s: 0.75 if s >= 2 else (0.55 if s == 1 else (0.40 if s == 0 else (0.25 if s == -1 else 0.10))))
+    df["target"] = (base * (1 - 0.25 * df["risk_on"])).round(3)
+    return df[["direction", "risk_on", "target"]]
 
 
 # ---------------- 2. 标的日线数据 ----------------
@@ -198,21 +235,17 @@ def build_equal_weight_index(price_data):
 # ---------------- 3. Backtrader 策略 ----------------
 
 class ScoreStrategy(bt.Strategy):
-    """按综合评分调仓：≥3 满仓 / 1~2 半仓 / 0 观望 / -1~-2 半仓 / ≤-3 清仓。
+    """按目标仓位序列调仓：target = 基准仓位（方向分）× 风险折减（风险灯）。
 
     params:
-        score_series: pd.Series，index 为日期，value 为综合评分
-        buy_threshold: 满仓阈值（默认 3）
-        sell_threshold: 清仓阈值（默认 -3）
+        score_series: pd.DataFrame，index 为日期，须含 target 列（0~1 目标仓位比例）
     """
     params = (
         ("score_series", None),
-        ("buy_threshold", 3),
-        ("sell_threshold", -3),
     )
 
     def __init__(self):
-        self.score_series = self.params.score_series
+        self.target_series = self.params.score_series["target"]
         self.trade_records = []  # 记录每次调仓
         self.order = None
 
@@ -227,44 +260,31 @@ class ScoreStrategy(bt.Strategy):
                 })
             self.order = None
 
-    def _target_pct(self, score):
-        """评分 → 目标仓位比例"""
-        if score >= self.params.buy_threshold:
-            return 1.0
-        elif score >= 1:
-            return 0.5
-        elif score == 0:
-            return None  # 维持现状
-        elif score > self.params.sell_threshold:
-            return 0.5
-        else:
-            return 0.0
-
     def next(self):
         if self.order:
             return
         today = self.data.datetime.date(0)
-        # 找最近一个评分（score_series 可能没有今天，取 <= today 的最后一个）
+        # 找最近一个目标仓位（序列可能没有今天，取 <= today 的最后一个）
         try:
-            score = self.score_series.loc[:pd.Timestamp(today)].iloc[-1]
+            target = self.target_series.loc[:pd.Timestamp(today)].iloc[-1]
         except (KeyError, IndexError):
             return
-        if pd.isna(score):
+        if pd.isna(target):
             return
-        target = self._target_pct(int(score))
-        if target is None:
-            return
-        self.order = self.order_target_percent(target=target)
+        cur = self.position.size if self.position else 0
+        if abs(target - cur) < 0.01:
+            return  # 变动不足 1% 不动，避免琐碎调仓
+        self.order = self.order_target_percent(target=float(target))
 
 
 # ---------------- 4. 回测主函数 ----------------
 
 def run_backtest(conn, score_series=None, price_data=None,
-                 buy_threshold=3, sell_threshold=-3,
                  initial_cash=1_000_000, commission=0.001):
     """跑回测，返回 dict（指标 + 资金曲线 + 交易明细）。
 
     若不传 score_series / price_data，自动从 db 构造。
+    score_series 为 build_daily_scores 的 DataFrame（direction/risk_on/target）。
     """
     if not HAS_BACKTRADER:
         return {"error": "未安装 backtrader，请运行 pip install backtrader"}
@@ -273,7 +293,7 @@ def run_backtest(conn, score_series=None, price_data=None,
     if price_data is None:
         price_data = build_price_data(conn)
 
-    if not price_data or score_series.empty:
+    if not price_data or getattr(score_series, "empty", True):
         return {"error": "数据不足，无法回测（需要至少两只股票的日线 + 评分序列）"}
 
     # 构造等权基准作为回测标的（简化：把组合当成一个资产）
@@ -294,10 +314,7 @@ def run_backtest(conn, score_series=None, price_data=None,
 
     data = bt.feeds.PandasData(dataname=benchmark)
     cerebro.adddata(data)
-    cerebro.addstrategy(ScoreStrategy,
-                        score_series=score_series,
-                        buy_threshold=buy_threshold,
-                        sell_threshold=sell_threshold)
+    cerebro.addstrategy(ScoreStrategy, score_series=score_series)
 
     # 分析器
     cerebro.addanalyzer(bt.analyzers.SharpeRatio, _name="sharpe", timeframe=bt.TimeFrame.Days)
